@@ -9,7 +9,7 @@ library which made this wrapper possible.
 
 ## Use
 
-   docker run -it pczerkas/vnc-recorder --help
+   docker run -it pczerkas/vnc-recorder-server --help
 
 ```
    NAME:
