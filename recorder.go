@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net"
 	"os/exec"
+	"strings"
 	"time"
 
 	vnc "github.com/amitbet/vnc2video"
@@ -28,6 +29,7 @@ func recorder_proc(conn net.Conn, cmd CommandStart, sessionId guuid.UUID) {
 	cchServer := make(chan vnc.ServerMessage)
 	cchClient := make(chan vnc.ClientMessage)
 	errorCh := make(chan error)
+	errorCh2 := make(chan error)
 
 	var secHandlers []vnc.SecurityHandler
 	if cmd.Password == "" {
@@ -71,7 +73,7 @@ func recorder_proc(conn net.Conn, cmd CommandStart, sessionId guuid.UUID) {
 		return
 	}
 
-	session_log(sessionId, "connected to " + address)
+	session_log(sessionId, "connected to "+address)
 
 	screenImage := vncConnection.Canvas
 
@@ -105,7 +107,7 @@ func recorder_proc(conn net.Conn, cmd CommandStart, sessionId guuid.UUID) {
 		vnc.EncCursorPseudo,
 		vnc.EncPointerPosPseudo,
 		vnc.EncCopyRect,
-		vnc.EncTight,
+		// vnc.EncTight, // buggy
 		vnc.EncZRLE,
 		vnc.EncHextile,
 		vnc.EncZlib,
@@ -116,7 +118,11 @@ func recorder_proc(conn net.Conn, cmd CommandStart, sessionId guuid.UUID) {
 		for {
 			timeStart := time.Now()
 
-			vcodec.Encode(sessionId, screenImage.Image)
+			err := vcodec.Encode(sessionId, screenImage.Image)
+			if err != nil {
+				errorCh2 <- err
+				return
+			}
 
 			timeTarget := timeStart.Add((1000 / time.Duration(vcodec.Framerate)) * time.Millisecond)
 			timeLeft := timeTarget.Sub(time.Now())
@@ -133,7 +139,15 @@ func recorder_proc(conn net.Conn, cmd CommandStart, sessionId guuid.UUID) {
 		case err := <-errorCh:
 			session_log(sessionId, "ERROR:")
 			session_log(sessionId, err.Error())
+			if strings.Contains(err.Error(), "EOF") {
+				session_log(sessionId, "Received EOF, maybe a resolution change.")
+				vcodec.Close(sessionId)
+			}
 			return
+		case err := <-errorCh2:
+			session_log(sessionId, "Encoded error received:")
+			session_log(sessionId, err.Error())
+			vcodec.Close(sessionId)
 		case msg := <-cchClient:
 			session_log(sessionId, msg.String())
 		case msg := <-cchServer:

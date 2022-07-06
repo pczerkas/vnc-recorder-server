@@ -1,10 +1,13 @@
 package main
 
+/**
+* XXX: Ugly workaround for https://github.com/amitbet/vnc2video/issues/10. I've copied the file and build a
+* X264ImageCustomEncoder. Once this is merged, we can drop the encoder.go file again.
+ */
+
 import (
 	"errors"
 	"fmt"
-	vnc "github.com/amitbet/vnc2video"
-	"github.com/amitbet/vnc2video/encoders"
 	"image"
 	"image/color"
 	"io"
@@ -12,6 +15,10 @@ import (
 	"os/exec"
 	"strconv"
 	"strings"
+	"time"
+
+	vnc "github.com/amitbet/vnc2video"
+	"github.com/amitbet/vnc2video/encoders"
 
 	guuid "github.com/google/uuid"
 )
@@ -119,12 +126,16 @@ func (enc *X264ImageCustomEncoder) Init(sessionId guuid.UUID, videoFileName stri
 	cmd := exec.Command(enc.FFMpegBinPath,
 		"-f", "image2pipe",
 		"-vcodec", "ppm",
+		"-r", strconv.Itoa(enc.Framerate),
 		"-an", // no audio
 		"-y",
 		"-i", "-",
+		"-vf", "pad=ceil(iw/2)*2:ceil(ih/2)*2",
 		"-vcodec", "libx264",
-		"-preset", "medium",
+		"-preset", "veryfast",
+		"-g", "250",
 		"-crf", strconv.Itoa(enc.ConstantRateFactor),
+		// https://github.com/saily/vnc-recorder/pull/8
 		"-pix_fmt", "yuv420p",
 		"-hide_banner",
 		"-loglevel", "panic",
@@ -155,16 +166,17 @@ func (enc *X264ImageCustomEncoder) Run(sessionId guuid.UUID, videoFileName strin
 	}
 	return nil
 }
-func (enc *X264ImageCustomEncoder) Encode(sessionId guuid.UUID, img image.Image) {
+func (enc *X264ImageCustomEncoder) Encode(sessionId guuid.UUID, img image.Image) error {
 	if enc.input == nil || enc.closed {
-		return
+		return nil
 	}
 
 	err := encodePPM(enc.input, img)
 	if err != nil && !strings.Contains(err.Error(), "file already closed") {
-		session_log(sessionId,"error while encoding image")
+		session_log(sessionId, "error while encoding image")
 		session_log(sessionId, err.Error())
 	}
+	return nil
 }
 
 func (enc *X264ImageCustomEncoder) Close(sessionId guuid.UUID) {
@@ -177,4 +189,5 @@ func (enc *X264ImageCustomEncoder) Close(sessionId guuid.UUID) {
 		session_log(sessionId, "could not close input")
 		session_log(sessionId, err.Error())
 	}
+	time.Sleep(2 * time.Second)
 }
