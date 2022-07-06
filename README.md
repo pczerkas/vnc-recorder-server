@@ -2,7 +2,6 @@
 
 > Fork of https://github.com/saily/vnc-recorder
 
-> this is wip, don't use in production!
 
 Record [VNC] screens to mp4 video using [ffmpeg]. Thanks to
 [amitbet for providing his vnc2video](https://github.com/amitbet/vnc2video)
@@ -10,7 +9,7 @@ library which made this wrapper possible.
 
 ## Use
 
-   docker run -it widerin/vnc-recorder --help
+   docker run -it pczerkas/vnc-recorder --help
 
 ```
    NAME:
