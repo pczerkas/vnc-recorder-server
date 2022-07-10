@@ -1,6 +1,9 @@
 #!/bin/sh
 
 #shellcheck disable=SC2009
+kill "$(ps | grep -E "3:.. /usr/local/bin/ffmpe[g]" | awk '{print $1}')"
+
+#shellcheck disable=SC2009
 (ps | grep -E "5:.. /usr/local/bin/ffmpe[g]") && exit 1
 
 netstat -an | grep 25192 >/dev/null
